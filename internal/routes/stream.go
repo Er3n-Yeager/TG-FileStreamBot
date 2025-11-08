@@ -51,6 +51,9 @@ func getStreamRoute(ctx *gin.Context) {
 
 	// Validate hash: we use first N chars of Telegram file_unique_id
 	if file.FileUniqueID == "" {
+		log.Error("FileUniqueID is empty",
+			zap.Int("messageID", messageID),
+			zap.String("fileName", file.FileName))
 		http.Error(w, "file unique id missing", http.StatusInternalServerError)
 		return
 	}
@@ -59,7 +62,18 @@ func getStreamRoute(ctx *gin.Context) {
 		hl = len(file.FileUniqueID)
 	}
 	expected := file.FileUniqueID[:hl]
+
+	log.Info("Hash validation",
+		zap.Int("messageID", messageID),
+		zap.String("provided_hash", authHash),
+		zap.String("expected_hash", expected),
+		zap.String("full_unique_id", file.FileUniqueID),
+		zap.Int("hash_length", hl))
+
 	if authHash != expected {
+		log.Warn("Hash mismatch",
+			zap.String("provided", authHash),
+			zap.String("expected", expected))
 		http.Error(w, "invalid hash", http.StatusBadRequest)
 		return
 	}
