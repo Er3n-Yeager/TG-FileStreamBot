@@ -75,26 +75,17 @@ func sendLink(ctx *ext.Context, u *ext.Update) error {
 		ctx.Reply(u, fmt.Sprintf("Error - %s", err.Error()), nil)
 		return dispatcher.EndGroups
 	}
-	fullHash := utils.PackFile(
-		file.FileName,
-		file.FileSize,
-		file.MimeType,
-		file.ID,
-	)
-	hash := utils.GetShortHash(fullHash)
-	link := fmt.Sprintf("%s/stream/%d?hash=%s", config.ValueOf.Host, messageID, hash)
-	
+
 	// Save to MongoDB
 	utils.Logger.Info("📝 Preparing to save file to MongoDB...",
 		zap.Int("msg_id", messageID),
 		zap.String("filename", file.FileName),
 		zap.Int64("size", file.FileSize))
-	
+
 	sessionID := uuid.New().String()
 	chatIDStr := strconv.FormatInt(config.ValueOf.LogChannelID, 10)
 	messageURL := fmt.Sprintf("https://t.me/c/%s/%d", strings.TrimPrefix(chatIDStr, "-100"), messageID)
-	retrievalLink := fmt.Sprintf("%s/stream/%d?hash=%s", config.ValueOf.Host, messageID, hash)
-	
+
 	// Get file_id and file_unique_id from the media
 	var fileID, fileUniqueID string
 	switch media := doc.(type) {
@@ -109,7 +100,13 @@ func sendLink(ctx *ext.Context, u *ext.Update) error {
 			fileUniqueID = utils.GetFileUniqueID(photo.FileReference)
 		}
 	}
-	
+
+	// Use first 6 chars of file_unique_id as hash
+	hash := fileUniqueID[:6]
+
+	link := fmt.Sprintf("%s/stream/%d?hash=%s", config.ValueOf.Host, messageID, hash)
+	retrievalLink := link
+
 	fileDoc := &database.FileDocument{
 		MsgID:         messageID,
 		ChatID:        chatIDStr,
@@ -123,11 +120,11 @@ func sendLink(ctx *ext.Context, u *ext.Update) error {
 		Title:         file.FileName,
 		Type:          file.MimeType,
 	}
-	
+
 	utils.Logger.Info("💾 Attempting to save to MongoDB...",
 		zap.String("collection", "files"),
 		zap.String("session_id", sessionID))
-	
+
 	if err := database.SaveFile(ctx, fileDoc); err != nil {
 		utils.Logger.Error("❌ Failed to save file to MongoDB", zap.Error(err))
 	} else {
@@ -136,7 +133,7 @@ func sendLink(ctx *ext.Context, u *ext.Update) error {
 			zap.String("session_id", sessionID),
 			zap.String("hash", hash))
 	}
-	
+
 	text := []styling.StyledTextOption{styling.Code(link)}
 	row := tg.KeyboardButtonRow{
 		Buttons: []tg.KeyboardButtonClass{
