@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gotd/td/telegram/message/styling"
 	"github.com/gotd/td/tg"
+	"go.uber.org/zap"
 )
 
 func (m *command) LoadStream(dispatcher dispatcher.Dispatcher) {
