@@ -2,9 +2,11 @@ package commands
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"EverythingSuckz/fsb/config"
+	"EverythingSuckz/fsb/internal/database"
 	"EverythingSuckz/fsb/internal/utils"
 
 	"github.com/celestix/gotgproto/dispatcher"
@@ -12,6 +14,7 @@ import (
 	"github.com/celestix/gotgproto/ext"
 	"github.com/celestix/gotgproto/storage"
 	"github.com/celestix/gotgproto/types"
+	"github.com/google/uuid"
 	"github.com/gotd/td/telegram/message/styling"
 	"github.com/gotd/td/tg"
 )
@@ -79,6 +82,48 @@ func sendLink(ctx *ext.Context, u *ext.Update) error {
 	)
 	hash := utils.GetShortHash(fullHash)
 	link := fmt.Sprintf("%s/stream/%d?hash=%s", config.ValueOf.Host, messageID, hash)
+	
+	// Save to MongoDB
+	sessionID := uuid.New().String()
+	chatIDStr := strconv.FormatInt(config.ValueOf.LogChannelID, 10)
+	messageURL := fmt.Sprintf("https://t.me/c/%s/%d", strings.TrimPrefix(chatIDStr, "-100"), messageID)
+	retrievalLink := fmt.Sprintf("%s/stream/%d?hash=%s", config.ValueOf.Host, messageID, hash)
+	
+	// Get file_id and file_unique_id from the media
+	var fileID, fileUniqueID string
+	switch media := doc.(type) {
+	case *tg.MessageMediaDocument:
+		if document, ok := media.Document.(*tg.Document); ok {
+			fileID = utils.GetTelegramFileID(document)
+			fileUniqueID = utils.GetFileUniqueID(document.FileReference)
+		}
+	case *tg.MessageMediaPhoto:
+		if photo, ok := media.Photo.(*tg.Photo); ok {
+			fileID = utils.GetTelegramPhotoFileID(photo)
+			fileUniqueID = utils.GetFileUniqueID(photo.FileReference)
+		}
+	}
+	
+	fileDoc := &database.FileDocument{
+		MsgID:         messageID,
+		ChatID:        chatIDStr,
+		FileID:        fileID,
+		FileUniqueID:  fileUniqueID,
+		Hash:          hash,
+		MessageURL:    messageURL,
+		RetrievalLink: retrievalLink,
+		SessionID:     sessionID,
+		Size:          file.FileSize,
+		Title:         file.FileName,
+		Type:          file.MimeType,
+	}
+	
+	if err := database.SaveFile(ctx, fileDoc); err != nil {
+		utils.Logger.Sugar().Error("Failed to save file to MongoDB: ", err)
+	} else {
+		utils.Logger.Sugar().Info("File saved to MongoDB with session_id: ", sessionID)
+	}
+	
 	text := []styling.StyledTextOption{styling.Code(link)}
 	row := tg.KeyboardButtonRow{
 		Buttons: []tg.KeyboardButtonClass{

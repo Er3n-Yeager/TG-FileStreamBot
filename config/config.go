@@ -50,6 +50,9 @@ type config struct {
 	UserSession    string       `envconfig:"USER_SESSION"`
 	UsePublicIP    bool         `envconfig:"USE_PUBLIC_IP" default:"false"`
 	AllowedUsers   allowedUsers `envconfig:"ALLOWED_USERS"`
+	MongoURI       string       `envconfig:"MONGO_URI" default:""`
+	MongoDBName    string       `envconfig:"MONGO_DB_NAME" default:"filestream"`
+	MongoCollection string      `envconfig:"MONGO_COLLECTION" default:"files"`
 	MultiTokens    []string
 }
 
@@ -83,6 +86,9 @@ func SetFlagsFromConfig(cmd *cobra.Command) {
 	cmd.Flags().Bool("use-session-file", ValueOf.UseSessionFile, "Use session files")
 	cmd.Flags().String("user-session", ValueOf.UserSession, "Pyrogram user session")
 	cmd.Flags().Bool("use-public-ip", ValueOf.UsePublicIP, "Use public IP instead of local IP")
+	cmd.Flags().String("mongo-uri", ValueOf.MongoURI, "MongoDB connection URI")
+	cmd.Flags().String("mongo-db-name", ValueOf.MongoDBName, "MongoDB database name")
+	cmd.Flags().String("mongo-collection", ValueOf.MongoCollection, "MongoDB collection name")
 	cmd.Flags().String("multi-token-txt-file", "", "Multi token txt file (Not implemented)")
 }
 
@@ -130,6 +136,18 @@ func (c *config) loadConfigFromArgs(log *zap.Logger, cmd *cobra.Command) {
 	usePublicIP, _ := cmd.Flags().GetBool("use-public-ip")
 	if usePublicIP {
 		os.Setenv("USE_PUBLIC_IP", strconv.FormatBool(usePublicIP))
+	}
+	mongoURI, _ := cmd.Flags().GetString("mongo-uri")
+	if mongoURI != "" {
+		os.Setenv("MONGO_URI", mongoURI)
+	}
+	mongoDBName, _ := cmd.Flags().GetString("mongo-db-name")
+	if mongoDBName != "" {
+		os.Setenv("MONGO_DB_NAME", mongoDBName)
+	}
+	mongoCollection, _ := cmd.Flags().GetString("mongo-collection")
+	if mongoCollection != "" {
+		os.Setenv("MONGO_COLLECTION", mongoCollection)
 	}
 	multiTokens, _ := cmd.Flags().GetString("multi-token-txt-file")
 	if multiTokens != "" {

@@ -4,9 +4,11 @@ import (
 	"EverythingSuckz/fsb/config"
 	"EverythingSuckz/fsb/internal/bot"
 	"EverythingSuckz/fsb/internal/cache"
+	"EverythingSuckz/fsb/internal/database"
 	"EverythingSuckz/fsb/internal/routes"
 	"EverythingSuckz/fsb/internal/types"
 	"EverythingSuckz/fsb/internal/utils"
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -32,6 +34,17 @@ func runApp(cmd *cobra.Command, args []string) {
 	mainLogger := log.Named("Main")
 	mainLogger.Info("Starting server")
 	config.Load(log, cmd)
+	
+	// Initialize MongoDB
+	if err := database.InitMongoDB(log, config.ValueOf.MongoURI, config.ValueOf.MongoDBName, config.ValueOf.MongoCollection); err != nil {
+		log.Error("Failed to initialize MongoDB", zap.Error(err))
+	}
+	defer func() {
+		if err := database.CloseMongoDB(context.Background()); err != nil {
+			log.Error("Failed to close MongoDB connection", zap.Error(err))
+		}
+	}()
+	
 	router := getRouter(log)
 
 	mainBot, err := bot.StartClient(log)

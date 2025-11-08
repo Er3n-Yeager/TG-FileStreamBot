@@ -10,6 +10,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/quantumsheep/range-parser v1.1.0
 	github.com/spf13/cobra v1.8.0
+	go.mongodb.org/mongo-driver v1.13.1
 )
 
 require (
