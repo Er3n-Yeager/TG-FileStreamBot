@@ -1,11 +1,13 @@
 package database
 
 import (
+	"EverythingSuckz/fsb/internal/utils"
 	"context"
 	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/zap"
@@ -27,43 +29,59 @@ type MongoDB struct {
 func InitMongoDB(log *zap.Logger, mongoURI, dbName, collectionName string) error {
 	log = log.Named("MongoDB")
 	
+	log.Info("=== MONGODB INITIALIZATION STARTED ===")
+	log.Info("MongoDB Configuration", 
+		zap.String("URI", mongoURI), 
+		zap.String("Database", dbName), 
+		zap.String("Collection", collectionName))
+	
 	if mongoURI == "" {
-		log.Warn("MongoDB URI not provided, skipping MongoDB initialization")
+		log.Warn("⚠️  MongoDB URI not provided, skipping MongoDB initialization")
+		log.Warn("   To enable MongoDB, set MONGO_URI in your fsb.env file")
 		return nil
 	}
 
+	log.Info("Connecting to MongoDB...")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	clientOptions := options.Client().ApplyURI(mongoURI)
 	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
+		log.Error("❌ Failed to connect to MongoDB", zap.Error(err))
 		return fmt.Errorf("failed to connect to MongoDB: %w", err)
 	}
+	log.Info("✓ MongoDB client connected")
 
 	// Ping the database to verify connection
+	log.Info("Pinging MongoDB to verify connection...")
 	err = client.Ping(ctx, nil)
 	if err != nil {
+		log.Error("❌ Failed to ping MongoDB", zap.Error(err))
 		return fmt.Errorf("failed to ping MongoDB: %w", err)
 	}
+	log.Info("✓ MongoDB ping successful")
 
 	Client = client
 	Database = client.Database(dbName)
 	Collection = Database.Collection(collectionName)
 
-	log.Info("Successfully connected to MongoDB", 
+	log.Info("✅ Successfully connected to MongoDB!", 
 		zap.String("database", dbName), 
 		zap.String("collection", collectionName))
 
 	// Create indexes
+	log.Info("Creating database indexes...")
 	if err := createIndexes(ctx, log); err != nil {
-		log.Error("Failed to create indexes", zap.Error(err))
+		log.Error("❌ Failed to create indexes", zap.Error(err))
 	}
 
+	log.Info("=== MONGODB INITIALIZATION COMPLETED ===")
 	return nil
 }
 
 func createIndexes(ctx context.Context, log *zap.Logger) error {
+	log.Info("Creating indexes for fields: msg_id, hash, file_id, session_id")
 	indexes := []mongo.IndexModel{
 		{
 			Keys:    bson.D{{Key: "msg_id", Value: 1}},
@@ -83,12 +101,13 @@ func createIndexes(ctx context.Context, log *zap.Logger) error {
 		},
 	}
 
-	_, err := Collection.Indexes().CreateMany(ctx, indexes)
+	indexNames, err := Collection.Indexes().CreateMany(ctx, indexes)
 	if err != nil {
+		log.Error("Failed to create indexes", zap.Error(err))
 		return err
 	}
 
-	log.Info("MongoDB indexes created successfully")
+	log.Info("✓ MongoDB indexes created successfully", zap.Int("count", len(indexNames)))
 	return nil
 }
 
@@ -98,7 +117,22 @@ func SaveFile(ctx context.Context, doc *FileDocument) error {
 	}
 
 	doc.CreatedAt = time.Now()
-	_, err := Collection.InsertOne(ctx, doc)
+	result, err := Collection.InsertOne(ctx, doc)
+	if err != nil {
+		return err
+	}
+	
+	// Log success with details
+	log := utils.Logger.Named("MongoDB")
+	log.Info("💾 File saved to MongoDB",
+		zap.String("_id", result.InsertedID.(primitive.ObjectID).Hex()),
+		zap.Int("msg_id", doc.MsgID),
+		zap.String("title", doc.Title),
+		zap.Int64("size", doc.Size),
+		zap.String("type", doc.Type),
+		zap.String("hash", doc.Hash),
+		zap.String("session_id", doc.SessionID))
+	
 	return err
 }
 

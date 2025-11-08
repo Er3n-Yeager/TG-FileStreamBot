@@ -84,6 +84,11 @@ func sendLink(ctx *ext.Context, u *ext.Update) error {
 	link := fmt.Sprintf("%s/stream/%d?hash=%s", config.ValueOf.Host, messageID, hash)
 	
 	// Save to MongoDB
+	utils.Logger.Info("📝 Preparing to save file to MongoDB...",
+		zap.Int("msg_id", messageID),
+		zap.String("filename", file.FileName),
+		zap.Int64("size", file.FileSize))
+	
 	sessionID := uuid.New().String()
 	chatIDStr := strconv.FormatInt(config.ValueOf.LogChannelID, 10)
 	messageURL := fmt.Sprintf("https://t.me/c/%s/%d", strings.TrimPrefix(chatIDStr, "-100"), messageID)
@@ -118,10 +123,17 @@ func sendLink(ctx *ext.Context, u *ext.Update) error {
 		Type:          file.MimeType,
 	}
 	
+	utils.Logger.Info("💾 Attempting to save to MongoDB...",
+		zap.String("collection", "files"),
+		zap.String("session_id", sessionID))
+	
 	if err := database.SaveFile(ctx, fileDoc); err != nil {
-		utils.Logger.Sugar().Error("Failed to save file to MongoDB: ", err)
+		utils.Logger.Error("❌ Failed to save file to MongoDB", zap.Error(err))
 	} else {
-		utils.Logger.Sugar().Info("File saved to MongoDB with session_id: ", sessionID)
+		utils.Logger.Info("✅ File successfully saved to MongoDB!",
+			zap.Int("msg_id", messageID),
+			zap.String("session_id", sessionID),
+			zap.String("hash", hash))
 	}
 	
 	text := []styling.StyledTextOption{styling.Code(link)}

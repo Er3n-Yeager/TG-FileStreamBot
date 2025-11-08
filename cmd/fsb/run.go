@@ -35,11 +35,17 @@ func runApp(cmd *cobra.Command, args []string) {
 	mainLogger.Info("Starting server")
 	config.Load(log, cmd)
 	
+	mainLogger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	mainLogger.Info("🔌 Initializing MongoDB Connection...")
+	mainLogger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	
 	// Initialize MongoDB
 	if err := database.InitMongoDB(log, config.ValueOf.MongoURI, config.ValueOf.MongoDBName, config.ValueOf.MongoCollection); err != nil {
-		log.Error("Failed to initialize MongoDB", zap.Error(err))
+		log.Error("❌ Failed to initialize MongoDB", zap.Error(err))
+		log.Warn("⚠️  Bot will continue without MongoDB support")
 	}
 	defer func() {
+		log.Info("Closing MongoDB connection...")
 		if err := database.CloseMongoDB(context.Background()); err != nil {
 			log.Error("Failed to close MongoDB connection", zap.Error(err))
 		}
