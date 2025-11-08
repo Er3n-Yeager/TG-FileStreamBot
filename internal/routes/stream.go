@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"EverythingSuckz/fsb/config"
 	"EverythingSuckz/fsb/internal/bot"
 	"EverythingSuckz/fsb/internal/utils"
 	"fmt"
@@ -48,13 +49,17 @@ func getStreamRoute(ctx *gin.Context) {
 		return
 	}
 
-	expectedHash := utils.PackFile(
-		file.FileName,
-		file.FileSize,
-		file.MimeType,
-		file.ID,
-	)
-	if !utils.CheckHash(authHash, expectedHash) {
+	// Validate hash: we use first N chars of Telegram file_unique_id
+	if file.FileUniqueID == "" {
+		http.Error(w, "file unique id missing", http.StatusInternalServerError)
+		return
+	}
+	hl := config.ValueOf.HashLength
+	if hl <= 0 || hl > len(file.FileUniqueID) {
+		hl = len(file.FileUniqueID)
+	}
+	expected := file.FileUniqueID[:hl]
+	if authHash != expected {
 		http.Error(w, "invalid hash", http.StatusBadRequest)
 		return
 	}

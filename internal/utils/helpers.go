@@ -61,11 +61,12 @@ func FileFromMedia(media tg.MessageMediaClass) (*types.File, error) {
 			}
 		}
 		return &types.File{
-			Location: document.AsInputDocumentFileLocation(),
-			FileSize: document.Size,
-			FileName: fileName,
-			MimeType: document.MimeType,
-			ID:       document.ID,
+			Location:     document.AsInputDocumentFileLocation(),
+			FileSize:     document.Size,
+			FileName:     fileName,
+			MimeType:     document.MimeType,
+			ID:           document.ID,
+			FileUniqueID: GetFileUniqueID(document.FileReference),
 		}, nil
 	case *tg.MessageMediaPhoto:
 		photo, ok := media.Photo.AsNotEmpty()
@@ -87,11 +88,12 @@ func FileFromMedia(media tg.MessageMediaClass) (*types.File, error) {
 		location.FileReference = photo.GetFileReference()
 		location.ThumbSize = size.GetType()
 		return &types.File{
-			Location: location,
-			FileSize: 0, // caller should judge if this is a photo or not
-			FileName: fmt.Sprintf("photo_%d.jpg", photo.GetID()),
-			MimeType: "image/jpeg",
-			ID:       photo.GetID(),
+			Location:     location,
+			FileSize:     0, // caller should judge if this is a photo or not
+			FileName:     fmt.Sprintf("photo_%d.jpg", photo.GetID()),
+			MimeType:     "image/jpeg",
+			ID:           photo.GetID(),
+			FileUniqueID: GetFileUniqueID(photo.GetFileReference()),
 		}, nil
 	}
 	return nil, fmt.Errorf("unexpected type %T", media)
